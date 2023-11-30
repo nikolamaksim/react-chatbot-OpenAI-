@@ -10,10 +10,11 @@ import { setPageUpdate } from "../redux/pageUpdateSlice";
 import AddPromptModal from "./AddPromptModal";
 import { Popover, PopoverHandler, PopoverContent } from "@material-tailwind/react";
 
+let loadingText = false; 
+
 export default function Interface() {
 
-    // const oepn_ai_api_key = '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';
-    const oepn_ai_api_key = process.env.OPENAI_API_KEY;
+    const oepn_ai_api_key = process.env.REACT_APP_OPENAI_API_KEY;
 
     const openai = new OpenAI({
         apiKey: oepn_ai_api_key,
@@ -23,6 +24,7 @@ export default function Interface() {
     const dispatch = useDispatch();
     const pageUpdate = useSelector((state) => state.pageUpdate);
 
+    const [loading, setLoading] = useState(false);
     const [submitSystemPrompt, setSubmitSystemPrompt] = useState('');
     const [submitUserPrompt, setSubmitUserPrompt] = useState('');
     const [responseMessage, setResponseMessage] = useState('');
@@ -73,46 +75,44 @@ export default function Interface() {
     // Submit Prompt
     const submitPrompt = async () => {
         if (submitSystemPrompt || submitUserPrompt) {
-            const stream = await openai.chat.completions.create({
-                model: 'gpt-3.5-turbo',
-                messages: [{
-                    role: 'system',
-                    content: submitSystemPrompt,
-                }, {
-                    role: 'user',
-                    content: submitUserPrompt,
-                }],
-                temperature: 0.7,
-                stream: true,
-            });
-            let content = '';
-            for await (const chunk of stream) {
-                content += chunk.choices[0].delta.content ? chunk.choices[0].delta.content : '';
-                setResponseMessage(content);
+            try {
+                setLoading(true);
+                if (!loadingText) {
+                    const stream = await openai.chat.completions.create({
+                        model: 'gpt-3.5-turbo',
+                        messages: [{
+                            role: 'system',
+                            content: submitSystemPrompt,
+                        }, {
+                            role: 'user',
+                            content: submitUserPrompt,
+                        }],
+                        temperature: 0.7,
+                        stream: true,
+                    });
+                    let content = ""
+                    loadingText = true;
+                    for await (const chunk of stream) {
+                        if (!loadingText)
+                            break;
+                        content += chunk.choices[0].delta.content ? chunk.choices[0].delta.content : '';
+                        setResponseMessage(content);
+                    }
+                    loadingText = false;
+                    setLoading(false);
+                };
+            } catch (err) {
+                console.log(err);
+                setLoading(false);
+                loadingText = false;
             }
-        } else {
-            alert('Please fill the prompt area.');
         }
-    }
-
-    // Cancel Generation
-    const cancelGeneration = async () => {
-        // const res = await openai.chat.completions.create({
-        //     model: 'gpt-3.5-turbo',
-        //     messages: [{
-        //         role: 'system',
-        //         content: 'STOP',
-        //     }],
-        //     temperature: 0.7,
-        // });
-        // console.log(res.data);
-        // setResponseMessage('');
     }
 
     useEffect(() => {
         fetchPrompts();
     }, [pageUpdate])
-
+    
     return (
         <>
         {
@@ -152,10 +152,11 @@ export default function Interface() {
                             <div className="px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
                                 <button
                                     type="button"
-                                    className="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:ml-3 sm:w-auto"
+                                    className={`inline-flex w-full justify-center rounded-md ${!loading ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-600'} px-3 py-2 text-sm font-semibold text-white shadow-sm sm:ml-3 sm:w-auto`}
                                     onClick={() => submitPrompt()}
+                                    disabled = {!loading ? false : true}
                                 >
-                                    Submit Text
+                                    {!loading ? 'Submit Text' : 'Generating...'}
                                 </button>
                             </div>
                         </div>
@@ -174,20 +175,28 @@ export default function Interface() {
                                     style={{
                                         minHeight: '25vh'
                                     }}
-                                    // defaultValue  ={responseMessage.slice(0, index).join(' ')}
                                     defaultValue={responseMessage}
                                     className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
                                     placeholder="Result Area"
                                 />
                             </div>
                             <div className="px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                                {loading
+                                ?
                                 <button
                                     type="button"
-                                    className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
-                                    onClick={() => cancelGeneration()}
+                                    className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-100 sm:mt-0 sm:w-auto"
+                                    onClick={() => {
+                                        loadingText = false;
+                                        setLoading(false)
+                                    }}
                                 >
                                     Stop Generation
                                 </button>
+                                :
+                                <div className="mt-3">
+                                </div>
+                                }
                             </div>
                         </div>
                     </div>
