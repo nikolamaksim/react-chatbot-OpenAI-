@@ -2,6 +2,8 @@
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 
+import OpenAI from "openai";
+
 import serverUrl from './../config/serverUrl.config.json';
 import { useDispatch, useSelector } from "react-redux";
 import { setPageUpdate } from "../redux/pageUpdateSlice";
@@ -10,11 +12,21 @@ import { Popover, PopoverHandler, PopoverContent } from "@material-tailwind/reac
 
 export default function Interface() {
 
+    // const oepn_ai_api_key = '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';
+    const oepn_ai_api_key = process.env.OPENAI_API_KEY;
+
+    const openai = new OpenAI({
+        apiKey: oepn_ai_api_key,
+        dangerouslyAllowBrowser: true,
+    });
+
     const dispatch = useDispatch();
     const pageUpdate = useSelector((state) => state.pageUpdate);
 
     const [submitSystemPrompt, setSubmitSystemPrompt] = useState('');
     const [submitUserPrompt, setSubmitUserPrompt] = useState('');
+    const [responseMessage, setResponseMessage] = useState('');
+
     const [selectedSystemRow, setSelectedSystemRow] = useState(null);
     const [selectedUserRow, setSelectedUserRow] = useState(null);
 
@@ -61,10 +73,40 @@ export default function Interface() {
     // Submit Prompt
     const submitPrompt = async () => {
         if (submitSystemPrompt || submitUserPrompt) {
-            alert('good');
+            const stream = await openai.chat.completions.create({
+                model: 'gpt-3.5-turbo',
+                messages: [{
+                    role: 'system',
+                    content: submitSystemPrompt,
+                }, {
+                    role: 'user',
+                    content: submitUserPrompt,
+                }],
+                temperature: 0.7,
+                stream: true,
+            });
+            let content = '';
+            for await (const chunk of stream) {
+                content += chunk.choices[0].delta.content ? chunk.choices[0].delta.content : '';
+                setResponseMessage(content);
+            }
         } else {
-            alert('bad');
+            alert('Please fill the prompt area.');
         }
+    }
+
+    // Cancel Generation
+    const cancelGeneration = async () => {
+        // const res = await openai.chat.completions.create({
+        //     model: 'gpt-3.5-turbo',
+        //     messages: [{
+        //         role: 'system',
+        //         content: 'STOP',
+        //     }],
+        //     temperature: 0.7,
+        // });
+        // console.log(res.data);
+        // setResponseMessage('');
     }
 
     useEffect(() => {
@@ -102,6 +144,7 @@ export default function Interface() {
                                         minHeight: '25vh'
                                     }}
                                     value={submitSystemPrompt + '\n' + submitUserPrompt}
+                                    disabled
                                     className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
                                     placeholder="Please select the prompts."
                                 />
@@ -110,7 +153,7 @@ export default function Interface() {
                                 <button
                                     type="button"
                                     className="inline-flex w-full justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 sm:ml-3 sm:w-auto"
-                                    onClick={submitPrompt}
+                                    onClick={() => submitPrompt()}
                                 >
                                     Submit Text
                                 </button>
@@ -131,6 +174,8 @@ export default function Interface() {
                                     style={{
                                         minHeight: '25vh'
                                     }}
+                                    // defaultValue  ={responseMessage.slice(0, index).join(' ')}
+                                    defaultValue={responseMessage}
                                     className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-primary-600 focus:border-primary-600 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-primary-500 dark:focus:border-primary-500"
                                     placeholder="Result Area"
                                 />
@@ -139,6 +184,7 @@ export default function Interface() {
                                 <button
                                     type="button"
                                     className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
+                                    onClick={() => cancelGeneration()}
                                 >
                                     Stop Generation
                                 </button>
