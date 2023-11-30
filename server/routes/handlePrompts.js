@@ -21,7 +21,7 @@ module.exports.add = async function (req, res) {
     } else {
         type = 1
     }
-    var sql = "INSERT INTO `prompts`(`prompt`, `type`) VALUES ('" + text + "', " + type + ")";
+    var sql = `INSERT INTO prompts (prompt, type) VALUES ("${text}", ${type})`;
     con.query(sql, function (err, result) {
         if (err) {
             console.log(err);
