@@ -106,6 +106,8 @@ export default function Interface() {
                 setLoading(false);
                 loadingText = false;
             }
+        } else {
+            alert('Please select prompts in the prompt list.')
         }
     }
 
